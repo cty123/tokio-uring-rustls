@@ -1,0 +1,20 @@
+[package]
+name = "tokio-uring-rustls"
+version = "0.1.0"
+authors = ["CTY <ctychen2216@gmail.com>"]
+description = "Integrate rustls into tokio-uring"
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "tokio_uring_rustls"
+path = "src/lib.rs"
+
+[dependencies]
+rustls = { version = "0.20" }
+tokio-uring = { path = "../tokio-uring", features = ["bytes"] }
+bytes = "1.2.1"
+
+[dev-dependencies]
+rustls = { version = "0.20", features = ["dangerous_configuration"] }
+rustls-pemfile = "1.0.1"
