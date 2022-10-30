@@ -12,7 +12,7 @@ path = "src/lib.rs"
 
 [dependencies]
 rustls = { version = "0.20" }
-tokio-uring = { path = "../tokio-uring", features = ["bytes"] }
+tokio-uring = { version = "0.3.0", features = ["bytes"] }
 bytes = "1.2.1"
 
 [dev-dependencies]

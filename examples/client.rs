@@ -20,6 +20,7 @@ impl ServerCertVerifier for NoCertificateVerification {
         Ok(ServerCertVerified::assertion())
     }
 }
+
 fn main() {
     let mut config = ClientConfig::builder()
         .with_safe_defaults()

@@ -145,11 +145,8 @@ impl SyncWriteAdaptor {
         // So if the buffer is None, we definitely have a bug somewhere when we forgot to return the buffer.
         let buffer = self.buffer.take().expect("bug: buffer ownership expected");
 
-        // Function write_all flushes the entire buffer, so we assume the write size equals buffer contend size
-        let n = buffer.len();
-
         // Call write operation on io to flush the data in the buffer
-        let (result, buffer) = io.write_all(buffer).await;
+        let (result, buffer) = io.write(buffer).await;
 
         // Regardless of the result of the write operation, we always need to return the buffer to the owner
         // such that the next write operation is able to use it.
@@ -157,7 +154,7 @@ impl SyncWriteAdaptor {
 
         // Check result and march inner buffer if successfully written
         match result {
-            Ok(()) => {
+            Ok(n) => {
                 // Safety:
                 unsafe { self.buffer.as_mut().unwrap_unchecked().advance(n) };
                 Ok(n)

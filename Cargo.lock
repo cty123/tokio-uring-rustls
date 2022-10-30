@@ -225,6 +225,8 @@ dependencies = [
 [[package]]
 name = "tokio-uring"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3ad494f39874984d990ade7f6319dafbcd3301ff0b1841f8a55a1ebb3e742c8"
 dependencies = [
  "bytes",
  "io-uring",
