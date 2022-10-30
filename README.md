@@ -6,3 +6,9 @@ Implementation details borrowed from the following projects:
 
 * [monoio-rustls](https://github.com/monoio-rs/monoio-tls) TLS Stream Wrapper for Monoio.
 * [tokio-rustls](https://github.com/tokio-rs/tls/tree/master/tokio-rustls) Asynchronous TLS/SSL streams for Tokio using Rustls.
+
+# Cargo Crate
+```
+tokio-uring-rustls = "0.1"
+```
+Link: https://crates.io/crates/tokio-uring-rustls
