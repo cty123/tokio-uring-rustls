@@ -5,6 +5,7 @@ authors = ["CTY <ctychen2216@gmail.com>"]
 description = "Integrate rustls into tokio-uring"
 license = "MIT"
 edition = "2021"
+repository = "https://github.com/cty123/tokio-uring-rustls"
 
 [lib]
 name = "tokio_uring_rustls"
