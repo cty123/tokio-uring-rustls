@@ -15,6 +15,7 @@ path = "src/lib.rs"
 rustls = { version = "0.20" }
 tokio-uring = { version = "0.3.0", features = ["bytes"] }
 bytes = "1.2.1"
+tokio = {version = "1.21", features = ["full"]}
 
 [dev-dependencies]
 rustls = { version = "0.20", features = ["dangerous_configuration"] }
