@@ -10,11 +10,20 @@ use tokio_uring::net::TcpListener;
 use tokio_uring_rustls::TlsAcceptor;
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8000".parse().unwrap()).unwrap();
+    let cmd = clap::Command::new("server")
+        .about("example rustls backed tls server using tokio-uring")
+        .arg(clap::Arg::new("cert").short('c').long("certificate"))
+        .arg(clap::Arg::new("key").short('k').long("key"))
+        .get_matches();
+
+    let cert_path = cmd.get_one::<String>("cert").unwrap();
+    let key_path = cmd.get_one::<String>("key").unwrap();
+
+    let listener = TcpListener::bind("0.0.0.0:8080".parse().unwrap()).unwrap();
 
     // Load certificates and keys
-    let certificates = load_certs("./certs/cert.pem").unwrap();
-    let key = load_private_key("./certs/key.pem").unwrap();
+    let certificates = load_certs(&cert_path).unwrap();
+    let key = load_private_key(&key_path).unwrap();
 
     // Use self signed certs for testing
     let cfg = ServerConfig::builder()

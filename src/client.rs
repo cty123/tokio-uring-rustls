@@ -27,7 +27,7 @@ impl TlsConnector {
     ) -> io::Result<TlsStream<ClientConnection>> {
         let session = match ClientConnection::new(self.inner.clone(), domain) {
             Ok(c) => c,
-            Err(_) => return Err(Error::new(ErrorKind::InvalidData, "")),
+            Err(e) => return Err(Error::new(ErrorKind::Other, e)),
         };
         let mut stream = TlsStream::new(socket, session);
         stream.handshake().await?;

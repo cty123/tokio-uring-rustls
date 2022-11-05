@@ -155,7 +155,7 @@ impl SyncWriteAdaptor {
         // Check result and march inner buffer if successfully written
         match result {
             Ok(n) => {
-                // Safety:
+                // Safety: buffer unwrap should always be successful because we just returned the buffer
                 unsafe { self.buffer.as_mut().unwrap_unchecked().advance(n) };
                 Ok(n)
             }

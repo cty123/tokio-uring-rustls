@@ -23,12 +23,7 @@ impl TlsAcceptor {
     pub async fn accept(&self, socket: TcpStream) -> io::Result<TlsStream<ServerConnection>> {
         let session = match ServerConnection::new(self.inner.clone()) {
             Ok(s) => s,
-            Err(_) => {
-                return Err(Error::new(
-                    ErrorKind::InvalidData,
-                    "Failed to create tls session",
-                ))
-            }
+            Err(e) => return Err(Error::new(ErrorKind::Other, e)),
         };
         let mut stream = TlsStream::new(socket, session);
         stream.handshake().await?;

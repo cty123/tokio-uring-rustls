@@ -68,6 +68,6 @@ fn main() {
             println!("Finished writing");
         });
 
-        tokio::join!(a, b);
+        let _ = tokio::join!(a, b);
     });
 }
