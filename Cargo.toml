@@ -1,6 +1,6 @@
 [package]
 name = "tokio-uring-rustls"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["CTY <ctychen2216@gmail.com>"]
 description = "Integrate rustls into tokio-uring"
 license = "MIT"
