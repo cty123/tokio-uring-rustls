@@ -8,3 +8,5 @@ pub use client::TlsConnector;
 pub use server::TlsAcceptor;
 pub use stream::TlsStream;
 pub use split::split;
+pub use split::ReadHalf;
+pub use split::WriteHalf;
