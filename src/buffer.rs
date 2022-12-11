@@ -1,9 +1,82 @@
-use bytes::{Buf, BufMut, BytesMut};
 use core::panic;
 use std::io;
-use tokio_uring::{buf::IoBuf, net::TcpStream};
+use tokio_uring::{buf::{IoBuf, IoBufMut}, net::TcpStream};
 
 const BUFFER_SIZE: usize = 16 * 1024;
+
+/// The following snippet of codes is directly copied from: 
+/// https://github.com/monoio-rs/monoio-tls/blob/master/monoio-rustls/src/safe_io.rs#L10
+/// 
+/// We will seek out other implementation of Ringbuffer in the future.
+/// 
+/// Copyright (c) 2022 ihciah and other Monoio Contributors
+///                              Apache License
+///                        Version 2.0, January 2004
+///                     http://www.apache.org/licenses/
+struct RingBuffer {
+    read: usize,
+    write: usize,
+    buf: Box<[u8]>,
+}
+
+impl RingBuffer {
+    fn with_capacity(size: usize) -> Self {
+        Self {
+            read: 0,
+            write: 0,
+            buf: vec![0; size].into_boxed_slice(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.write - self.read
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    fn available(&self) -> usize {
+        self.buf.len() - self.write
+    }
+
+    fn is_full(&self) -> bool {
+        self.available() == 0
+    }
+
+    fn advance(&mut self, n: usize) {
+        assert!(self.write - self.read >= n);
+        self.read += n;
+        if self.read == self.write {
+            self.read = 0;
+            self.write = 0;
+        }
+    }
+}
+
+unsafe impl tokio_uring::buf::IoBuf for RingBuffer {
+    fn bytes_init(&self) -> usize {
+        self.write - self.read
+    }
+
+    fn stable_ptr(&self) -> *const u8 {
+        unsafe { self.buf.as_ptr().add(self.read) }
+    }
+
+    fn bytes_total(&self) -> usize {
+        self.buf.len() - self.write
+    }
+}
+
+unsafe impl tokio_uring::buf::IoBufMut for RingBuffer {
+    unsafe fn set_init(&mut self, pos: usize) {
+        self.write += pos;
+    }
+
+    fn stable_mut_ptr(&mut self) -> *mut u8 {
+        unsafe { self.buf.as_mut_ptr().add(self.write) }
+    }
+}
 
 #[derive(Debug)]
 enum ReadStatus {
@@ -13,14 +86,14 @@ enum ReadStatus {
 }
 
 pub(crate) struct SyncReadAdaptor {
-    buffer: Option<BytesMut>,
+    buffer: Option<RingBuffer>,
     status: ReadStatus,
 }
 
 impl Default for SyncReadAdaptor {
     fn default() -> Self {
         Self {
-            buffer: Some(BytesMut::with_capacity(BUFFER_SIZE)),
+            buffer: Some(RingBuffer::with_capacity(BUFFER_SIZE)),
             status: ReadStatus::Ok,
         }
     }
@@ -118,14 +191,14 @@ enum WriteStatus {
 }
 
 pub(crate) struct SyncWriteAdaptor {
-    buffer: Option<BytesMut>,
+    buffer: Option<RingBuffer>,
     status: WriteStatus,
 }
 
 impl Default for SyncWriteAdaptor {
     fn default() -> Self {
         Self {
-            buffer: Some(BytesMut::with_capacity(BUFFER_SIZE)),
+            buffer: Some(RingBuffer::with_capacity(BUFFER_SIZE)),
             status: WriteStatus::Ok,
         }
     }
@@ -133,11 +206,10 @@ impl Default for SyncWriteAdaptor {
 
 impl SyncWriteAdaptor {
     pub(crate) async fn do_io(&mut self, io: &mut TcpStream) -> io::Result<usize> {
-        // Take the reference of the buffer. We already expect the buffer to be present instead of None
-        let buffer = self.buffer.as_ref().expect("bug: buffer ref expected");
-
+        // println!("Buffer size: {}, remain: {}, cap: {}", self.buffer.as_ref().unwrap().len(), self.buffer.as_ref().unwrap().remaining(), self.buffer.as_ref().unwrap().capacity());
         // If buffer is empty, we don't have any additional data to write
-        if buffer.is_empty() {
+        if self.buffer.as_ref().unwrap().is_empty() {
+            println!("Buffer already empty, nothing to write");
             return Ok(0);
         }
 
@@ -188,17 +260,16 @@ impl io::Write for SyncWriteAdaptor {
             }
         }
 
-        let available_space = buffer.capacity() - buffer.len();
-
         // If we have absolutely 0 available spots in the buffer, instead of growing the buffer capacity,
         // we would want to flush it first.
-        if available_space == 0 {
+        if buffer.is_full() {
             return Err(io::ErrorKind::WouldBlock.into());
         }
 
         // If the payload size is larger than the buffer can actually take, we do our best to fill the buffer.
-        let copy_size = available_space.min(buf.len());
-        buffer.put_slice(&buf[..copy_size]);
+        let copy_size = buffer.available().min(buf.len());
+        unsafe { std::ptr::copy_nonoverlapping(buf.as_ptr(), buffer.stable_mut_ptr(), copy_size) };
+        unsafe { buffer.set_init(copy_size) };
 
         Ok(copy_size)
     }
