@@ -25,10 +25,17 @@ struct RingBuffer {
 
 impl RingBuffer {
     fn with_capacity(size: usize) -> Self {
+        let mut buf = Vec::<u8>::with_capacity(size);
+        
+        // Safety: size always equals the capacity
+        unsafe {
+            buf.set_len(size);
+        }
+
         Self {
             read: 0,
             write: 0,
-            buf: vec![0; size].into_boxed_slice(),
+            buf: buf.into_boxed_slice(),
             capacity: size,
         }
     }
