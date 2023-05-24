@@ -1,14 +1,17 @@
 use core::panic;
 use std::io;
-use tokio_uring::{buf::{IoBuf, IoBufMut}, net::TcpStream};
+use tokio_uring::{
+    buf::{IoBuf, IoBufMut},
+    net::TcpStream,
+};
 
-const BUFFER_SIZE: usize = 16 * 1024;
+const BUFFER_SIZE: usize = 8 * 1024;
 
-/// The following snippet of codes is directly copied from: 
+/// The following snippet of codes is directly copied from:
 /// https://github.com/monoio-rs/monoio-tls/blob/master/monoio-rustls/src/safe_io.rs#L10
-/// 
+///
 /// We will seek out other implementation of Ringbuffer in the future.
-/// 
+///
 /// Copyright (c) 2022 ihciah and other Monoio Contributors
 ///                              Apache License
 ///                        Version 2.0, January 2004
@@ -16,6 +19,7 @@ const BUFFER_SIZE: usize = 16 * 1024;
 struct RingBuffer {
     read: usize,
     write: usize,
+    capacity: usize,
     buf: Box<[u8]>,
 }
 
@@ -25,21 +29,26 @@ impl RingBuffer {
             read: 0,
             write: 0,
             buf: vec![0; size].into_boxed_slice(),
+            capacity: size,
         }
     }
 
+    #[inline]
     fn len(&self) -> usize {
         self.write - self.read
     }
 
+    #[inline]
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     fn available(&self) -> usize {
-        self.buf.len() - self.write
+        self.capacity - self.write
     }
 
+    #[inline]
     fn is_full(&self) -> bool {
         self.available() == 0
     }
@@ -64,7 +73,7 @@ unsafe impl tokio_uring::buf::IoBuf for RingBuffer {
     }
 
     fn bytes_total(&self) -> usize {
-        self.buf.len() - self.write
+        self.capacity - self.write
     }
 }
 
@@ -104,7 +113,7 @@ impl SyncReadAdaptor {
         // Take the reference of the buffer. We already expect the buffer to be present instead of None
         let buffer = self.buffer.as_ref().expect("bug: buffer ref expected");
 
-        // if there are some data inside the buffer, just return.
+        // If there are some data inside the buffer, just return.
         if !buffer.is_empty() {
             return Ok(buffer.len());
         }
@@ -154,13 +163,8 @@ impl io::Read for SyncReadAdaptor {
         // If buffer is empty, we need to check for 2 cases:
         //   1. Buffer empty due to previous read operation failure: broken pipe, EOF etc.
         //   2. No read operation so far. Ex. read operation never started
-        //
-        // For case #1, we should properly handle the failure by returning appropriate error status code.
-        //
-        // For case #2, we should return would block error to indicate that read operation is not ready yet,
-        // and it's up to the caller to start read operation and keep polling. Returning would block error
-        // is similar to returning Poll::Pending for async operations.
         if buffer.is_empty() {
+            // For case #1, we should properly handle the failure by returning appropriate error status code.
             if !matches!(self.status, ReadStatus::Ok) {
                 match std::mem::replace(&mut self.status, ReadStatus::Ok) {
                     ReadStatus::Eof => return Ok(0),
@@ -168,6 +172,10 @@ impl io::Read for SyncReadAdaptor {
                     ReadStatus::Ok => panic!("bug: unexpected branch"),
                 }
             }
+
+            // For case #2, we should return would block error to indicate that read operation is not ready yet,
+            // and it's up to the caller to start read operation and keep polling. Returning would block error
+            // is similar to returning Poll::Pending for async operations.
             return Err(io::ErrorKind::WouldBlock.into());
         }
 
@@ -206,10 +214,8 @@ impl Default for SyncWriteAdaptor {
 
 impl SyncWriteAdaptor {
     pub(crate) async fn do_io(&mut self, io: &mut TcpStream) -> io::Result<usize> {
-        // println!("Buffer size: {}, remain: {}, cap: {}", self.buffer.as_ref().unwrap().len(), self.buffer.as_ref().unwrap().remaining(), self.buffer.as_ref().unwrap().capacity());
         // If buffer is empty, we don't have any additional data to write
         if self.buffer.as_ref().unwrap().is_empty() {
-            println!("Buffer already empty, nothing to write");
             return Ok(0);
         }
 

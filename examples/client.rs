@@ -51,7 +51,7 @@ fn main() {
 
         // Send get request
         let data = "GET / HTTP/1.1\r\n\r\n".as_bytes();
-        let (_, _) = stream.write(data).await;
+        let (_, _) = stream.write_all(data).await;
 
         // Read response
         let buf = vec![0u8; 1024 * 4];

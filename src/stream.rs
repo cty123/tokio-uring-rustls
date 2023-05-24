@@ -166,14 +166,13 @@ where
     pub async fn write<B: tokio_uring::buf::IoBuf>(&mut self, buf: B) -> BufResult<usize, B> {
         let slice = unsafe { std::slice::from_raw_parts(buf.stable_ptr(), buf.bytes_init()) };
 
-        match self.session.writer().write_all(slice) {
-            Ok(_) => (),
+        let size = match self.session.writer().write(slice) {
+            Ok(l) => l,
             Err(e) => return (Err(e), buf),
         };
 
-        match self.session.writer().flush() {
-            Ok(_) => (),
-            Err(e) => return (Err(e), buf),
+        if let Err(e) = self.session.writer().flush() {
+            return (Err(e), buf);
         }
 
         while self.session.wants_write() {
@@ -186,6 +185,30 @@ where
             }
         }
 
-        return (Ok(slice.len()), buf);
+        return (Ok(size), buf);
+    }
+
+    pub async fn write_all<B: tokio_uring::buf::IoBuf>(&mut self, buf: B) -> BufResult<(), B> {
+        let slice = unsafe { std::slice::from_raw_parts(buf.stable_ptr(), buf.bytes_init()) };
+
+        if let Err(e) = self.session.writer().write_all(slice) {
+            return (Err(e), buf);
+        }
+
+        if let Err(e) = self.session.writer().flush() {
+            return (Err(e), buf);
+        }
+
+        while self.session.wants_write() {
+            match self.write_io().await {
+                Ok(0) => {
+                    break;
+                }
+                Ok(_) => (),
+                Err(e) => return (Err(e), buf),
+            }
+        }
+
+        return (Ok(()), buf);
     }
 }

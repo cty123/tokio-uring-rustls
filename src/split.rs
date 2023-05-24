@@ -37,6 +37,11 @@ where
         let inner = unsafe { &mut *self.inner.get() };
         return inner.write(buf).await;
     }
+
+    pub async fn write_all<B: tokio_uring::buf::IoBuf>(&mut self, buf: B) -> BufResult<(), B> {
+        let inner = unsafe { &mut *self.inner.get() };
+        return inner.write_all(buf).await;
+    }
 }
 
 pub fn split<C: DerefMut + Deref<Target = ConnectionCommon<SD>>, SD: SideData + 'static>(
